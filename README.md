@@ -63,4 +63,15 @@ void ESPOTADASH::processReceivedCommand(const String& command) {
   }
   // Add more conditions for other actions as needed.
 }
+
+// Code executed during the OTA update process start
+void ESPOTADASH::updateStart() {
+ // display.clearDisplay();
+ // display.setTextSize(1);
+ // display.setTextColor(SSD1306_WHITE);
+ // display.setCursor(0, 10);
+ // display.println("Updating firmware...");
+ // display.display();
+}
+
 `````
