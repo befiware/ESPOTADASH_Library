@@ -1,4 +1,6 @@
 #include "ESPOTADASH.h"
+#include <WiFiClientSecure.h>
+
 
 ESPOTADASH::ESPOTADASH(const char* ssid, const char* password, const char* hostName, const char* serverAddress, unsigned long heartbeatInterval, unsigned long registrationInterval, unsigned long commandCheckInterval, unsigned long updateInterval, const char* firmwareVersion) {
   this->ssid = ssid;
@@ -10,6 +12,7 @@ ESPOTADASH::ESPOTADASH(const char* ssid, const char* password, const char* hostN
   this->registrationInterval = registrationInterval;
   this->updateInterval = updateInterval;
   this->firmwareVersion = firmwareVersion;
+
 }
 
 void ESPOTADASH::begin() {
@@ -28,6 +31,8 @@ void ESPOTADASH::begin() {
     lastRegistrationTime = millis(); // Set the last registration time to the current time
   }
 }
+
+
 
 // Helper function to manually encode the hostName
 String ESPOTADASH::urlEncode(const String& str) {
@@ -98,15 +103,20 @@ void ESPOTADASH::loop() {
         // Inside the `case State::CHECK_WIFI:` block, replace the existing if statement with this
         if (currentMillis - lastUpdateTime >= updateInterval) {
           lastUpdateTime = currentMillis; // Update the last update time
-          WiFiClient client;
-          HTTPClient http;
+          WiFiClientSecure client;
+          client.setInsecure();
+
+
+
+          HTTPClient https;
           String updateURL = (String(serverAddress) + "/updateStatus?hostName=" + urlEncode(hostName)); // Use the urlEncode() function here
-          http.begin(client, updateURL);
-          int httpCode = http.GET();
+          https.begin(client, updateURL);
+          int httpCode = https.GET();
           if (httpCode == HTTP_CODE_OK) {
-            String response = http.getString();
+            String response = https.getString();
             if (response == "Update Available") {
               Serial.println("Firmware update available. Starting OTA update...");
+              updateStart();
               sendFirmwareFlashingInitiated();
               isFirmwareFlashing = true; // Set the flag to indicate that firmware flashing is ongoing
               #if defined(ESP8266)
@@ -127,7 +137,7 @@ void ESPOTADASH::loop() {
               }
             }
 
-            http.end();
+            https.end();
           }
         }
       } else {
@@ -151,41 +161,89 @@ void ESPOTADASH::loop() {
 
 void ESPOTADASH::registerToNodeJS(const char* hostName, const char* firmwareVersion, const char* macAddress, int wifiSignalStrength) {
   // Connect to the Node.js server using HTTP POST request
-  WiFiClient client;
-  HTTPClient http;
+  WiFiClientSecure client;
+  client.setInsecure();
+
+
+
+  HTTPClient https;
+
   // Construct the registration URL with the host name and firmware version parameters
   String registrationURL = String(serverAddress) + "/register";
-  http.begin(client, registrationURL);
+
+
+  https.begin(client, registrationURL);
   // Set the host name, firmware version, MAC address, Wi-Fi signal strength, and IP address as the request data
   String postData = String(hostName) + "\n" + firmwareVersion + "\n" + macAddress + "\n" + wifiSignalStrength + "\n" + WiFi.localIP().toString();
-  http.addHeader("Content-Type", "text/plain");
-  int httpCode = http.POST(postData);
+  https.addHeader("Content-Type", "text/plain");
+  int httpCode = https.POST(postData);
   if (httpCode > 0) {
     Serial.printf("Registered with Node.js server. HTTP code: %d\n", httpCode);
   } else {
-    Serial.printf("Failed to connect to Node.js server. HTTP error: %s\n", http.errorToString(httpCode).c_str());
+    Serial.printf("Failed to connect to Node.js server. HTTP error: %s\n", https.errorToString(httpCode).c_str());
   }
-  http.end();
+  https.end();
 }
 
 void ESPOTADASH::sendHeartbeat() {
   // Connect to the Node.js server using HTTP POST request
-  WiFiClient client;
-  HTTPClient http;
+  WiFiClientSecure client;
+  client.setInsecure();
+
+
+  HTTPClient https;
+
   // Construct the heartbeat URL with the host name parameter
   String heartbeatURL = String(serverAddress) + "/heartbeat";
-  http.begin(client, heartbeatURL);
+
+  https.begin(client, heartbeatURL);
+
   // Set the host name as the request data
   String postData = String(hostName);
-  http.addHeader("Content-Type", "text/plain");
-  int httpCode = http.POST(postData);
+
+
+  https.addHeader("Content-Type", "text/plain");
+  int httpCode = https.POST(postData);
   if (httpCode > 0) {
     Serial.printf("Heartbeat sent to Node.js server. HTTP code: %d\n", httpCode);
   } else {
-    Serial.printf("Failed to send heartbeat to Node.js server. HTTP error: %s\n", http.errorToString(httpCode).c_str());
+    Serial.printf("Failed to send heartbeat to Node.js server. HTTP error: %s\n", https.errorToString(httpCode).c_str());
   }
 
-  http.end();
+  https.end();
+}
+
+void ESPOTADASH::sendFirmwareFlashingInitiated() {
+    // Connect to the Node.js server using HTTP POST request
+    WiFiClientSecure client;
+    client.setInsecure();
+
+
+
+    HTTPClient https;
+
+    // Construct the URL for sending the firmware flashing initiated message
+    String firmwareInitiatedURL = String(serverAddress) + "/firmwareInitiated?hostName=" + urlEncode(hostName); // Include the hostname as a query parameter
+
+    https.begin(client, firmwareInitiatedURL);
+
+    Serial.println(firmwareInitiatedURL);
+
+
+    // Set the host name as the request data
+    String postData = String(hostName);
+
+
+    https.addHeader("Content-Type", "text/plain");
+    int httpCode = https.POST(postData);
+
+    if (httpCode > 0) {
+        Serial.printf("Firmware flashing initiated message sent to Node.js server. HTTP code: %d\n", httpCode);
+    } else {
+        Serial.printf("Failed to send firmware flashing initiated message to Node.js server. HTTP error: %s\n", https.errorToString(httpCode).c_str());
+    }
+
+    https.end();
 }
 
 void ESPOTADASH::reRegisterDevice() {
@@ -193,52 +251,33 @@ void ESPOTADASH::reRegisterDevice() {
   registerToNodeJS(hostName, firmwareVersion, WiFi.macAddress().c_str(), WiFi.RSSI());
 }
 
-void ESPOTADASH::sendFirmwareFlashingInitiated() {
-    // Connect to the Node.js server using HTTP POST request
-    WiFiClient client;
-    HTTPClient http;
 
-    // Construct the URL for sending the firmware flashing initiated message
-    String firmwareInitiatedURL = String(serverAddress) + "/firmwareInitiated?hostName=" + urlEncode(hostName); // Include the hostname as a query parameter
-
-    http.begin(client, firmwareInitiatedURL);
-
-    // Set the request data (you can include additional data if needed)
-    String postData = "Hello"; // Modify this line to send the "Hello" message or any other data
-    http.addHeader("Content-Type", "text/plain");
-    int httpCode = http.POST(postData);
-
-    if (httpCode > 0) {
-        Serial.printf("Firmware flashing initiated message sent to Node.js server. HTTP code: %d\n", httpCode);
-    } else {
-        Serial.printf("Failed to send firmware flashing initiated message to Node.js server. HTTP error: %s\n", http.errorToString(httpCode).c_str());
-    }
-
-    http.end();
-}
 
 String ESPOTADASH::getCommandFromServer() {
   // Connect to the Node.js server using HTTP GET request
-  WiFiClient client;
-  HTTPClient http;
+  WiFiClientSecure client;
+  client.setInsecure();
+
+
+  HTTPClient https;
 
   // Construct the URL to request the command
   String commandURL = String(serverAddress) + "/getCommand?hostName=" + urlEncode(hostName);
 
-  http.begin(client, commandURL);
+  https.begin(client, commandURL);
 
   // Set the content type to "text/plain" for the HTTP GET request
-  http.addHeader("Content-Type", "text/plain");
+  https.addHeader("Content-Type", "text/plain");
 
   // Send the HTTP GET request
-  int httpCode = http.GET();
+  int httpCode = https.GET();
   if (httpCode == HTTP_CODE_OK) {
-    String response = http.getString();
+    String response = https.getString();
     //Serial.print("Received command from server: ");
     //Serial.println(response);
 
     // Close the connection
-    http.end();
+    https.end();
 
     // Add a small delay to allow the server to respond
     delay(100);
@@ -247,10 +286,10 @@ String ESPOTADASH::getCommandFromServer() {
     return response;
   } else {
     Serial.printf("HTTP error code: %d\n", httpCode);
-    Serial.printf("Failed to fetch command from the server. HTTP error: %s\n", http.errorToString(httpCode).c_str());
+    Serial.printf("Failed to fetch command from the server. HTTP error: %s\n", https.errorToString(httpCode).c_str());
 
     // Close the connection in case of an error
-    http.end();
+    https.end();
   }
 
   return ""; // Return an empty string if no command received or there was an error

@@ -19,6 +19,9 @@ public:
   void begin();
   void loop();
   void processReceivedCommand(const String& command);
+  void updateStart();
+
+
 
 private:
   const char* ssid;
@@ -26,6 +29,7 @@ private:
   const char* hostName;
   const char* serverAddress;
   const char* firmwareVersion;
+
   unsigned long lastHeartbeatTime = 0;
   unsigned long heartbeatInterval;
   unsigned long lastRegistrationTime = 0;
