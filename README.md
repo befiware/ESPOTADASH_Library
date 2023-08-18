@@ -4,6 +4,7 @@
 Forked from ErfanDL/ESPOTADASH_Library
 
 Added functionality have https connection with <WiFiClientSecure.h>
+
 ------------------------------------------------------------------------------------------------------------------
 
 The library for ESP OTA Dashboard supports both ESP8266 and ESP32 [ESP OTA Dashboard](https://github.com/ErfanDL/ESP_OTA_Dashboard)
