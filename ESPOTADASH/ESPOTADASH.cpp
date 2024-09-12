@@ -15,20 +15,27 @@ ESPOTADASH::ESPOTADASH(const char* ssid, const char* password, const char* hostN
 
 }
 
+
 void ESPOTADASH::begin() {
+  Serial.println("OTA begin function called.");
   Serial.begin(115200);
   WiFi.begin(ssid, password);
+  int attempts = 0;
 
-  // Add a delay here to allow some time for Wi-Fi connection to initialize
-  delay(2000);
+  while (WiFi.status() != WL_CONNECTED && attempts < 10) {
+    delay(1000);  // Wait a second before retrying
+    Serial.println("Connecting to Wi-Fi...");
+    attempts++;
+  }
 
-  // Register with the Node.js server on startup
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.hostname(hostName);
     Serial.print("Registering host name: ");
     Serial.println(hostName);
     registerToNodeJS(hostName, firmwareVersion, WiFi.macAddress().c_str(), WiFi.RSSI());
-    lastRegistrationTime = millis(); // Set the last registration time to the current time
+    lastRegistrationTime = millis();
+  } else {
+    Serial.println("Wi-Fi not connected after several attempts.");
   }
 }
 
@@ -106,7 +113,7 @@ void ESPOTADASH::loop() {
           WiFiClientSecure client;
           client.setInsecure();
 
-
+     
 
           HTTPClient https;
           String updateURL = (String(serverAddress) + "/updateStatus?hostName=" + urlEncode(hostName)); // Use the urlEncode() function here
@@ -174,7 +181,7 @@ void ESPOTADASH::registerToNodeJS(const char* hostName, const char* firmwareVers
 
   https.begin(client, registrationURL);
   // Set the host name, firmware version, MAC address, Wi-Fi signal strength, and IP address as the request data
-  String postData = String(hostName) + "\n" + firmwareVersion + "\n" + macAddress + "\n" + wifiSignalStrength + "\n" + WiFi.localIP().toString();
+  String postData = String(hostName) + "\n" + firmwareVersion + "\n" + macAddress + "\n" + wifiSignalStrength + "\n" + WiFi.localIP().toString() + "\n" + started;
   https.addHeader("Content-Type", "text/plain");
   int httpCode = https.POST(postData);
   if (httpCode > 0) {
@@ -183,6 +190,8 @@ void ESPOTADASH::registerToNodeJS(const char* hostName, const char* firmwareVers
     Serial.printf("Failed to connect to Node.js server. HTTP error: %s\n", https.errorToString(httpCode).c_str());
   }
   https.end();
+
+  started = 0;
 }
 
 void ESPOTADASH::sendHeartbeat() {
@@ -218,7 +227,7 @@ void ESPOTADASH::sendFirmwareFlashingInitiated() {
     WiFiClientSecure client;
     client.setInsecure();
 
-
+   
 
     HTTPClient https;
 

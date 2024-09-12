@@ -29,6 +29,7 @@ private:
   const char* hostName;
   const char* serverAddress;
   const char* firmwareVersion;
+  int started = 1;
 
   unsigned long lastHeartbeatTime = 0;
   unsigned long heartbeatInterval;
